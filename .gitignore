@@ -1,0 +1,61 @@
+# ============================================================
+#  SECRETOS — nunca deben llegar al repositorio
+# ============================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.ppk
+*.key
+application-local.yml
+application-secrets.yml
+
+# ============================================================
+#  Backend (Java / Maven)
+# ============================================================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+dependency-reduced-pom.xml
+
+# ============================================================
+#  Frontend (Node / Vite)
+# ============================================================
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================================
+#  Logs
+# ============================================================
+*.log
+logs/
+
+# ============================================================
+#  Editores e IDE
+# ============================================================
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/extensions.json
+.settings/
+.project
+.classpath
+*.swp
+
+# ============================================================
+#  Sistema operativo
+# ============================================================
+Thumbs.db
+Desktop.ini
+.DS_Store

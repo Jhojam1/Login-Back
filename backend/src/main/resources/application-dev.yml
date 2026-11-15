@@ -1,0 +1,27 @@
+# ============================================================================
+#  Perfil DEV: para trabajar en tu equipo sin instalar ninguna base de datos.
+#  Usa H2 en memoria, asi que los datos se borran al apagar la aplicacion.
+#  Arranque:  mvn spring-boot:run
+# ============================================================================
+spring:
+  datasource:
+    url: jdbc:h2:mem:authdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console   # Explorador web de la base: http://localhost:8080/h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # Crea las tablas al arrancar y las borra al cerrar
+    show-sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+
+logging:
+  level:
+    com.proyecto.auth: DEBUG
+    org.hibernate.SQL: DEBUG

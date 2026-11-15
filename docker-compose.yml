@@ -1,0 +1,33 @@
+# ============================================================================
+#  PostgreSQL local para desarrollo.
+#
+#  Sirve para probar el perfil "prod" en tu PC con una base de datos real, igual que
+#  la de AWS RDS, sin tener que crear nada en la nube.
+#
+#  Arrancar:   docker compose up -d
+#  Parar:      docker compose down        (los datos se conservan)
+#  Borrar todo: docker compose down -v    (elimina tambien los datos)
+#
+#  Las credenciales coinciden con las de backend/.env.example.
+# ============================================================================
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: authadmin
+      POSTGRES_PASSWORD: authpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authadmin -d authdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  auth-pgdata:

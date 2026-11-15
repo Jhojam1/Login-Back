@@ -1,0 +1,44 @@
+# ============================================================================
+#  Perfil PROD: PostgreSQL (AWS RDS en el servidor, o uno local para probar).
+#
+#  NINGUNA credencial se escribe aqui. Todas llegan como variables, desde:
+#    - el archivo backend/.env       (en tu PC, o en el EC2 si lo prefieres)
+#    - /etc/auth-service.env         (en el EC2, cargado por systemd)
+#  Plantilla con todas las variables: backend/.env.example
+# ============================================================================
+spring:
+  datasource:
+    # sslmode=prefer cifra la conexion si el servidor lo permite. AWS RDS con
+    # PostgreSQL 15 o superior EXIGE SSL por defecto, y con "prefer" funciona sin
+    # configurar certificados. Para exigir cifrado siempre: DB_SSLMODE=require
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}?sslmode=${DB_SSLMODE:prefer}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}   # Conexiones simultaneas; ajustalo al tamano de la RDS
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      # 'update' crea las tablas que falten (necesario la primera vez).
+      # 'validate' solo comprueba que coincidan, sin tocarlas: usalo cuando ya existan.
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 20
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+logging:
+  level:
+    root: WARN
+    com.proyecto.auth: INFO
+  # Vacio = solo consola (en el EC2, systemd ya la guarda y se consulta con journalctl).
+  # Para guardar ademas en archivo: LOG_FILE=/var/log/auth-service/application.log
+  file:
+    name: ${LOG_FILE:}
