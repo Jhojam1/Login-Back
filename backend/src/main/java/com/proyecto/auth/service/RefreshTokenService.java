@@ -50,4 +50,17 @@ public interface RefreshTokenService {
      * @return numero de registros eliminados
      */
     int purgeExpired();
+
+    /**
+     * Cuenta las sesiones abiertas de un usuario.
+     *
+     * <p>Una sesion se considera abierta mientras su token de refresco siga vigente y
+     * no se haya revocado. Es la mejor aproximacion disponible a "esta conectado":
+     * el token de acceso no se guarda en ninguna parte, asi que no hay forma de saber
+     * si la persona esta usando la aplicacion en este preciso instante.</p>
+     *
+     * @param user usuario a consultar
+     * @return numero de sesiones abiertas; 0 si cerro sesion o si caducaron todas
+     */
+    long countActiveSessions(User user);
 }

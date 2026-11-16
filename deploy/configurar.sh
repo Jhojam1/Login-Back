@@ -96,12 +96,30 @@ IMAGE_REPO=$(preguntar "Tu usuario de Docker Hub" "")
 IMAGE_REPO="${IMAGE_REPO%/login}/login"   # admite que escriban el /login o no
 
 echo
-echo "--- Base de datos (te lo pasa quien administra el RDS) ---"
-DB_HOST=$(preguntar "Endpoint del RDS")
-DB_PORT=$(preguntar "Puerto" "5432")
-DB_NAME=$(preguntar "Nombre de la base de datos" "authdb")
-DB_USERNAME=$(preguntar "Usuario" "auth_app")
-DB_PASSWORD=$(preguntarOculto "Contrasena (no se vera al escribir)")
+echo "--- Base de datos ---"
+echo "Si todavia no te han pasado los datos del RDS, puedes responder que NO:"
+echo "se configurara una base de datos H2 en memoria para que puedas probar el"
+echo "despliegue completo ya mismo. Los datos se pierden al reiniciar, asi que"
+echo "es solo para probar; cuando tengas el RDS, vuelve a ejecutar este script."
+echo
+read -r -p "Ya tienes los datos de la base de datos? [S/n]: " TIENE_BD
+
+case "${TIENE_BD:-s}" in
+    n|N|no|NO|No)
+        PERFIL="dev"
+        echo
+        echo ">> Modo prueba: base de datos H2 en memoria, sin PostgreSQL."
+        ;;
+    *)
+        PERFIL="prod"
+        echo
+        DB_HOST=$(preguntar "Endpoint del RDS")
+        DB_PORT=$(preguntar "Puerto" "5432")
+        DB_NAME=$(preguntar "Nombre de la base de datos" "authdb")
+        DB_USERNAME=$(preguntar "Usuario" "auth_app")
+        DB_PASSWORD=$(preguntarOculto "Contrasena (no se vera al escribir)")
+        ;;
+esac
 
 echo
 echo "--- Administrador de la aplicacion ---"
@@ -132,6 +150,13 @@ cat > "$DESTINO" <<ENV
 # NO subir este archivo a Git.
 
 IMAGE_REPO=$IMAGE_REPO
+SPRING_PROFILES_ACTIVE=$PERFIL
+ENV
+
+# El bloque de la base de datos solo tiene sentido en modo produccion: en modo
+# prueba el perfil "dev" usa H2 en memoria e ignora cualquier dato de conexion.
+if [ "$PERFIL" = "prod" ]; then
+cat >> "$DESTINO" <<ENV
 
 DB_HOST=$DB_HOST
 DB_PORT=$DB_PORT
@@ -140,6 +165,16 @@ DB_USERNAME=$DB_USERNAME
 DB_PASSWORD=$DB_PASSWORD
 DB_SSLMODE=require
 DDL_AUTO=update
+ENV
+else
+cat >> "$DESTINO" <<ENV
+
+# Modo prueba: base de datos H2 en memoria, los datos se borran al reiniciar.
+# Cuando tengas el RDS, vuelve a ejecutar configurar.sh y responde que SI.
+ENV
+fi
+
+cat >> "$DESTINO" <<ENV
 
 APP_JWT_SECRET=$APP_JWT_SECRET
 APP_SERVICE_API_KEY=$APP_SERVICE_API_KEY
@@ -163,7 +198,13 @@ echo "  Listo: .env creado"
 echo "================================================================"
 echo
 echo "Imagenes:       $IMAGE_REPO:backend-latest / :frontend-latest"
-echo "Base de datos:  $DB_USERNAME@$DB_HOST:$DB_PORT/$DB_NAME"
+if [ "$PERFIL" = "prod" ]; then
+    echo "Base de datos:  $DB_USERNAME@$DB_HOST:$DB_PORT/$DB_NAME"
+else
+    echo "Base de datos:  H2 en memoria (MODO PRUEBA)"
+    echo "                Los datos se borran al reiniciar el contenedor."
+    echo "                Cuando tengas el RDS, ejecuta este script otra vez."
+fi
 echo "Frontend:       $APP_ALLOWED_ORIGINS"
 echo
 echo "Esta clave es la que debe usar el equipo del servicio de S3 para"

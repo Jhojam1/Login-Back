@@ -6,6 +6,7 @@ import com.proyecto.auth.dto.request.RefreshTokenRequest;
 import com.proyecto.auth.dto.request.RegisterRequest;
 import com.proyecto.auth.dto.response.AuthResponse;
 import com.proyecto.auth.dto.response.IntrospectTokenResponse;
+import com.proyecto.auth.dto.response.SessionStatusResponse;
 import com.proyecto.auth.dto.response.UserResponse;
 
 /**
@@ -78,4 +79,18 @@ public interface AuthService {
      * @param request  contrasena actual y nueva
      */
     void changePassword(String username, ChangePasswordRequest request);
+
+    /**
+     * Indica si un usuario tiene la sesion iniciada, sin necesidad de su token.
+     *
+     * <p>Pensado para microservicios que solo quieren mostrar informacion, por ejemplo
+     * marcar quien esta conectado en un listado.</p>
+     *
+     * <p><b>No sirve para autorizar.</b> Que alguien tenga una sesion abierta no
+     * demuestra que sea quien hace la peticion. Para eso esta {@link #introspect}.</p>
+     *
+     * @param identifier nombre de usuario o correo
+     * @return estado de la sesion de esa persona
+     */
+    SessionStatusResponse checkSessionStatus(String identifier);
 }

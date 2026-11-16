@@ -123,6 +123,18 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     /**
+     * Cuenta las sesiones abiertas de un usuario consultando sus tokens de refresco.
+     *
+     * @param user usuario a consultar
+     * @return numero de sesiones abiertas
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public long countActiveSessions(User user) {
+        return refreshTokenRepository.countActiveSessions(user, Instant.now());
+    }
+
+    /**
      * Recorta el user-agent al tamano de la columna para evitar errores de insercion.
      *
      * @param userAgent cabecera recibida, puede ser nula

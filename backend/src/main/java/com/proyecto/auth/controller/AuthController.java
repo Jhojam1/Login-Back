@@ -6,9 +6,11 @@ import com.proyecto.auth.dto.request.IntrospectTokenRequest;
 import com.proyecto.auth.dto.request.LoginRequest;
 import com.proyecto.auth.dto.request.RefreshTokenRequest;
 import com.proyecto.auth.dto.request.RegisterRequest;
+import com.proyecto.auth.dto.request.SessionStatusRequest;
 import com.proyecto.auth.dto.response.AuthResponse;
 import com.proyecto.auth.dto.response.IntrospectTokenResponse;
 import com.proyecto.auth.dto.response.MessageResponse;
+import com.proyecto.auth.dto.response.SessionStatusResponse;
 import com.proyecto.auth.dto.response.UserResponse;
 import com.proyecto.auth.service.AuthService;
 import com.proyecto.auth.service.UserService;
@@ -184,6 +186,34 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(authService.introspect(request.token()));
+    }
+
+    /**
+     * Indica si un usuario tiene la sesion iniciada, a partir de su nombre.
+     *
+     * <p>Pensado para servicios que solo quieren mostrar informacion (por ejemplo
+     * marcar quien esta conectado) y que no reciben el token de la persona.</p>
+     *
+     * <p><b>No usar para autorizar.</b> Cualquiera puede escribir un nombre de usuario
+     * en el cuerpo de la peticion, asi que la respuesta no demuestra quien esta
+     * llamando. Para decidir si se permite una operacion hay que usar
+     * {@code /introspect} con el token de quien la solicita.</p>
+     *
+     * @param request    usuario a consultar
+     * @param serviceKey clave compartida del servicio que pregunta
+     * @return 200 con el estado de la sesion, o 401 si la clave de servicio es incorrecta
+     */
+    @PostMapping("/session-status")
+    @Operation(summary = "Saber si un usuario tiene sesion iniciada (solo informativo)")
+    public ResponseEntity<SessionStatusResponse> sessionStatus(
+            @Valid @RequestBody SessionStatusRequest request,
+            @RequestHeader(value = "X-Service-Key", required = false) String serviceKey) {
+
+        if (!isServiceKeyValid(serviceKey)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        return ResponseEntity.ok(authService.checkSessionStatus(request.username()));
     }
 
     /**

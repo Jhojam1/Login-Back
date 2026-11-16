@@ -33,7 +33,10 @@ services:
       - ./.env
 
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      # Se puede cambiar a "dev" desde el .env para una prueba rapida con una base
+      # de datos H2 en memoria, sin necesidad de PostgreSQL. Si no se indica nada,
+      # se usa prod. Sin el ${...} este valor pisaria siempre al del .env.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
 
     # "expose" y no "ports": el 8080 queda accesible solo para los otros
     # contenedores, nunca desde internet. Todo el trafico entra por el frontend.

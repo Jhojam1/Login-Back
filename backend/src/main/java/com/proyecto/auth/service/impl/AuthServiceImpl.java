@@ -11,6 +11,7 @@ import com.proyecto.auth.dto.request.RefreshTokenRequest;
 import com.proyecto.auth.dto.request.RegisterRequest;
 import com.proyecto.auth.dto.response.AuthResponse;
 import com.proyecto.auth.dto.response.IntrospectTokenResponse;
+import com.proyecto.auth.dto.response.SessionStatusResponse;
 import com.proyecto.auth.dto.response.UserResponse;
 import com.proyecto.auth.exception.BusinessException;
 import com.proyecto.auth.exception.DuplicateResourceException;
@@ -277,6 +278,38 @@ public class AuthServiceImpl implements AuthService {
         // a quien pudiera haber robado la cuenta.
         refreshTokenService.revokeAll(user);
         log.info("El usuario {} cambio su contrasena", username);
+    }
+
+    /**
+     * Comprueba si un usuario tiene alguna sesion abierta.
+     *
+     * <p>Se acepta tanto el nombre de usuario como el correo, igual que en el login,
+     * para que quien pregunte no tenga que saber cual de los dos guardamos.</p>
+     *
+     * <p>Una cuenta desactivada o bloqueada se informa como no conectada aunque le
+     * queden tokens sin caducar: no va a poder usar el sistema, asi que decir que
+     * esta conectada seria enganoso.</p>
+     *
+     * @param identifier nombre de usuario o correo
+     * @return estado de la sesion
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public SessionStatusResponse checkSessionStatus(String identifier) {
+        return userRepository.findByUsernameOrEmail(identifier)
+                .map(user -> {
+                    boolean utilizable = user.isEnabled() && !user.isAccountLocked();
+                    long sesiones = utilizable ? refreshTokenService.countActiveSessions(user) : 0;
+
+                    return SessionStatusResponse.builder()
+                            .username(user.getUsername())
+                            .exists(true)
+                            .loggedIn(sesiones > 0)
+                            .activeSessions(sesiones)
+                            .lastLoginAt(user.getLastLoginAt())
+                            .build();
+                })
+                .orElseGet(() -> SessionStatusResponse.notFound(identifier));
     }
 
     /**
