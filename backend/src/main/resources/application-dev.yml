@@ -27,13 +27,20 @@ logging:
     org.hibernate.SQL: DEBUG
 
 # ============================================================================
-#  La verificacion en dos pasos sigue ACTIVA en local, pero el codigo se escribe
-#  en el log en lugar de enviarse por correo: en un portatil no suele haber
-#  credenciales de AWS y, sin ellas, cada intento de login fallaria.
+#  El correo de verificacion se envia DE VERDAD tambien en este perfil.
 #
-#  Si quieres probar el envio real desde tu equipo, ejecuta antes "aws configure"
-#  y borra estas dos lineas.
+#  El perfil dev solo cambia la base de datos (H2 en memoria en lugar de
+#  PostgreSQL); el envio del codigo funciona igual que en produccion, porque es
+#  justo lo que hay que poder probar.
+#
+#  Requisito: que haya credenciales de AWS disponibles. En el EC2 las aporta el
+#  rol IAM de la instancia sin configurar nada. En un portatil hace falta
+#  ejecutar "aws configure" una vez.
+#
+#  Si trabajas en local sin credenciales y prefieres que el codigo salga por el
+#  log en lugar de fallar el login, descomenta estas dos lineas:
+#
+# app:
+#   lambda:
+#     enabled: false
 # ============================================================================
-app:
-  lambda:
-    enabled: false
