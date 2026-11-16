@@ -1,0 +1,24 @@
+# Lo que NO se envia al contexto de construccion de Docker.
+
+# node_modules local: la imagen instala los suyos con npm ci.
+# Copiarlos romperia la construccion, porque pueden traer binarios compilados
+# para Windows que no funcionan dentro de una imagen Linux.
+node_modules/
+
+# Resultado de compilaciones locales: la imagen compila lo suyo desde cero
+dist/
+*.tsbuildinfo
+
+# Configuracion local
+.env
+.env.*
+!.env.example
+
+# Control de versiones y editores
+.git
+.gitignore
+.idea/
+.vscode/
+
+# Logs
+*.log

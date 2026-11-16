@@ -7,14 +7,6 @@ contraseñas, le preguntan a este si un token es válido.
 
 ---
 
-## Documentación
-
-| Documento | Para qué sirve |
-|---|---|
-| [**Guía de despliegue en AWS**](docs/GUIA-AWS-PASO-A-PASO.md) | Paso a paso desde cero: EC2, RDS, Nginx, systemd. Empieza aquí para subirlo a la nube. |
-| [**Contrato de integración**](docs/CONTRATO-INTEGRACION.md) | Pásaselo al equipo del servicio de S3. Explica cómo validar tokens con ejemplos en Java, Node y Python. |
-| [**Esquema de base de datos**](docs/ESQUEMA-BASE-DATOS.md) | Diagrama, DDL de referencia y consultas SQL útiles. |
-
 ---
 
 ## Qué incluye
@@ -91,7 +83,9 @@ a Git**. El código no contiene ninguna contraseña: solo lee esas variables.
 
 ```powershell
 # 1. Un PostgreSQL local (requiere Docker Desktop abierto)
-docker compose up -d
+docker run -d --name auth-postgres -p 5432:5432 `
+  -e POSTGRES_DB=authdb -e POSTGRES_USER=authadmin -e POSTGRES_PASSWORD=authpass `
+  postgres:16-alpine
 
 # 2. Crea tu archivo de configuración a partir de la plantilla
 cd backend
@@ -105,8 +99,8 @@ Para usar la base de datos de AWS RDS en lugar de la local, cambia en `.env` los
 `DB_HOST`, `DB_NAME`, `DB_USERNAME` y `DB_PASSWORD` por los de RDS. Para volver a H2,
 pon `SPRING_PROFILES_ACTIVE=dev` o borra el `.env`.
 
-En el servidor EC2 se usa el mismo mecanismo; está explicado en el paso 8.2 de la
-[guía de AWS](docs/GUIA-AWS-PASO-A-PASO.md).
+En el servidor EC2 se usa el mismo mecanismo: el archivo `deploy/.env`, que genera el
+script `deploy/configurar.sh`.
 
 ### Credenciales de prueba
 
@@ -122,7 +116,12 @@ Cualquier cuenta que te crees desde el registro recibe `ROLE_USER`.
 
 ```
 Login/
+├── .github/workflows/
+│   └── docker-image.yml             CI/CD: pruebas, imágenes y despliegue
+│
 ├── backend/                         Spring Boot 3.5 · Java 21
+│   ├── Dockerfile                   Imagen de la API
+│   ├── .env.example                 Plantilla de configuración (para tu PC)
 │   ├── pom.xml
 │   └── src/main/
 │       ├── java/com/proyecto/auth/
@@ -146,6 +145,8 @@ Login/
 │           └── application-prod.yml PostgreSQL (AWS RDS)
 │
 ├── frontend/                        React 19 · TypeScript · Tailwind 4
+│   ├── Dockerfile                   Imagen de la interfaz (React + Nginx)
+│   ├── nginx.conf.template          Sirve React y reenvía /api al backend
 │   └── src/
 │       ├── api/                     Cliente HTTP e interceptores
 │       ├── components/
@@ -161,8 +162,22 @@ Login/
 │       ├── types/                   Contrato con el backend
 │       └── utils/                   Traducción de códigos a texto legible
 │
-└── docs/                            Guías de despliegue e integración
+└── deploy/                          Lo que se copia al EC2
+    ├── docker-compose.yml           Arranca los dos contenedores
+    ├── .env.example                 Plantilla de configuración (para el servidor)
+    └── configurar.sh                Genera el .env preguntando lo imprescindible
 ```
+
+### Los tres `.env.example`
+
+No son copias del mismo archivo: cada uno pertenece a una máquina distinta. Se copian
+quitándoles el `.example` y el resultado nunca se sube a Git.
+
+| Archivo | Dónde se usa | Qué contiene |
+|---|---|---|
+| `backend/.env` | tu PC | Base de datos y secretos para `mvn spring-boot:run` |
+| `frontend/.env` | tu PC | Una variable opcional; con Docker ni se lee |
+| `deploy/.env` | el EC2 | Qué imágenes bajar + credenciales de producción |
 
 ---
 

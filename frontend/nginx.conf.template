@@ -1,0 +1,91 @@
+# =============================================================================
+#  Configuracion de Nginx dentro del contenedor del frontend.
+#
+#  Es una plantilla: la imagen de Nginx sustituye ${BACKEND_URL} por el valor de
+#  la variable de entorno al arrancar el contenedor. Asi la misma imagen sirve
+#  para desarrollo y para el EC2 sin volver a construirla.
+# =============================================================================
+
+server {
+    # 8080 y no 80: el contenedor corre con un usuario sin privilegios, y un
+    # usuario normal no puede abrir puertos por debajo del 1024.
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # El DNS interno de Docker. Hace falta declararlo para que Nginx vuelva a
+    # resolver el nombre del backend cada pocos segundos: al desplegar, el
+    # contenedor del backend se recrea con otra IP, y sin esto Nginx seguiria
+    # apuntando a la vieja y devolveria 502 hasta reiniciarlo.
+    #
+    # OJO: la direccion 127.0.0.11 solo existe dentro de una red propia de Docker.
+    # Docker Compose siempre crea una, asi que en el despliegue real funciona. Si
+    # alguna vez lanzas este contenedor con "docker run" suelto, pasale tambien
+    # --network <alguna-red-creada-con-docker-network-create>: en la red por
+    # defecto no hay DNS interno y las llamadas a /api se quedarian colgadas.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    # ---------- Compresion ----------
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    # ---------- API: se reenvia al backend ----------
+    location /api/ {
+        # El destino se guarda en una variable a proposito: con un nombre literal,
+        # Nginx resolveria el DNS una sola vez al arrancar y lo cachearia para
+        # siempre, que es justo lo que el resolver de arriba viene a evitar.
+        set $backend "${BACKEND_URL}";
+        proxy_pass $backend$request_uri;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        # Sin esta cabecera, la auditoria del backend registraria siempre la IP
+        # del contenedor de Nginx en lugar de la de la persona.
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout    60s;
+    }
+
+    # ---------- Comprobacion de estado del backend ----------
+    location /actuator/health {
+        set $backend_health "${BACKEND_URL}";
+        proxy_pass $backend_health$request_uri;
+        access_log off;
+    }
+
+    # ---------- Archivos con huella en el nombre ----------
+    # Vite les pone un hash: si el contenido cambia, cambia el nombre. Por eso se
+    # pueden cachear un ano sin riesgo de servir una version vieja.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # ---------- Comprobacion de estado del propio Nginx ----------
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    # ---------- El resto: la aplicacion React ----------
+    location / {
+        # Clave en una aplicacion de una sola pagina: si la ruta no existe como
+        # archivo, se devuelve index.html y React Router decide que pintar. Sin
+        # esta linea, recargar /panel/usuarios daria un 404.
+        try_files $uri $uri/ /index.html;
+
+        # index.html nunca se cachea: es quien dice cual es la version actual de
+        # los archivos con hash. Si se cacheara, tras un despliegue el navegador
+        # seguiria pidiendo archivos que ya no existen.
+        add_header Cache-Control "no-cache, must-revalidate";
+    }
+}

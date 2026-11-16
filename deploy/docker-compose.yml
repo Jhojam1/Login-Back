@@ -1,0 +1,99 @@
+# =============================================================================
+#  Despliegue en el EC2.
+#
+#  Este archivo NO construye nada: solo descarga las imagenes que GitHub Actions
+#  publico en Docker Hub y las arranca. La base de datos es AWS RDS, asi que
+#  tampoco hay un contenedor de PostgreSQL aqui.
+#
+#  En la instancia solo hacen falta dos archivos:
+#
+#    ~/login-deploy/
+#      ├── docker-compose.yml     este archivo
+#      └── .env                   toda la configuracion (plantilla: .env.example)
+#
+#  Uso en la instancia:
+#    docker compose pull          descarga las imagenes nuevas
+#    docker compose up -d         arranca o actualiza los contenedores
+#    docker compose logs -f       ver los registros
+#    docker compose down          parar todo
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  #  API (Spring Boot)
+  # ---------------------------------------------------------------------------
+  backend:
+    image: ${IMAGE_REPO}:backend-latest
+    container_name: login-backend
+    restart: unless-stopped
+
+    # Las credenciales salen del .env de al lado, que no esta en Git. En este
+    # archivo no hay ni una contrasena escrita.
+    env_file:
+      - ./.env
+
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+
+    # "expose" y no "ports": el 8080 queda accesible solo para los otros
+    # contenedores, nunca desde internet. Todo el trafico entra por el frontend.
+    expose:
+      - "8080"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+    # Sin limite, la JVM y el sistema pueden competir por la RAM y el kernel acaba
+    # matando el proceso. En una t2.micro (1 GB) este reparto deja aire al sistema.
+    mem_limit: 700m
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"   # Sin esto los logs crecen hasta llenar el disco
+        max-file: "3"
+
+    networks:
+      - login-net
+
+  # ---------------------------------------------------------------------------
+  #  Interfaz web (React servido por Nginx) + pasarela hacia la API
+  # ---------------------------------------------------------------------------
+  frontend:
+    image: ${IMAGE_REPO}:frontend-latest
+    container_name: login-frontend
+    restart: unless-stopped
+
+    # 80 en la maquina -> 8080 dentro del contenedor, que corre sin privilegios.
+    ports:
+      - "80:8080"
+
+    environment:
+      # "backend" es el nombre del servicio de arriba: Docker lo resuelve por DNS
+      # dentro de la red, sin necesidad de saber ninguna IP.
+      BACKEND_URL: http://backend:8080
+
+    # Espera a que el backend responda de verdad, no solo a que arranque: asi
+    # nadie se encuentra un 502 durante el primer medio minuto de un despliegue.
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    mem_limit: 128m
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - login-net
+
+networks:
+  login-net:
+    driver: bridge

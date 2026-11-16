@@ -1,0 +1,22 @@
+# Lo que NO se envia al contexto de construccion de Docker.
+# Reduce el tamano del contexto y, sobre todo, evita que un secreto local
+# acabe dentro de la imagen.
+
+# Credenciales locales: jamas deben entrar en la imagen
+.env
+.env.*
+!.env.example
+
+# Resultado de compilaciones locales: la imagen compila lo suyo desde cero
+target/
+
+# Control de versiones y editores
+.git
+.gitignore
+.idea/
+.vscode/
+*.iml
+
+# Logs y temporales
+*.log
+logs/
