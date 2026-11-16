@@ -153,7 +153,7 @@ jobs:
           script_stop: true
           # Las credenciales viajan como variables de entorno de la sesion SSH y no
           # como texto dentro del script: asi no aparecen en el log de la ejecucion.
-          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,COMPOSE_URL
           script: |
             set -e
 
@@ -190,8 +190,32 @@ jobs:
             # Solo hace falta si el repositorio de Docker Hub es privado
             echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
+            # El docker-compose.yml vive en el servidor, no dentro de las imagenes, asi
+            # que sin esto se quedaria congelado en la version del dia que se instalo:
+            # cualquier cambio en el compose no llegaria nunca y daria fallos muy raros.
+            # Se descarga la version EXACTA de este commit, para que compose e imagenes
+            # vayan siempre a la par.
+            echo "Actualizando docker-compose.yml desde el repositorio..."
+            cp docker-compose.yml docker-compose.yml.anterior
+            if curl -fsSL -o docker-compose.yml.nuevo "$COMPOSE_URL"; then
+              mv docker-compose.yml.nuevo docker-compose.yml
+            else
+              rm -f docker-compose.yml.nuevo
+              echo "AVISO: no se pudo descargar el compose nuevo (repositorio privado?)."
+              echo "       Se sigue con el que ya habia en el servidor."
+            fi
+
             docker compose pull
-            docker compose up -d --remove-orphans
+
+            # Si el arranque falla, se imprimen los registros del backend: sin esto el
+            # log de GitHub solo diria "container is unhealthy", que no explica nada.
+            if ! docker compose up -d --remove-orphans; then
+              echo ""
+              echo "===== EL ARRANQUE FALLO. Ultimas lineas del backend ====="
+              docker compose logs backend --tail 60 2>&1 || true
+              echo "========================================================"
+              exit 1
+            fi
 
             # Borra las imagenes viejas que quedan sin usar; en un disco de 30 GB
             # se llenan rapido si se acumula una por despliegue.
@@ -201,3 +225,5 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          # Version exacta de este commit, para que compose e imagenes coincidan
+          COMPOSE_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/deploy/docker-compose.yml
