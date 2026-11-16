@@ -79,6 +79,33 @@ jobs:
       - name: Preparar Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Comprueba que los secretos llegan antes de intentar el login, para que el
+      # fallo diga QUE falta en lugar del escueto "Username and password required".
+      # Los valores se pasan por env y nunca se imprimen: solo su longitud.
+      - name: Comprobar los secretos de Docker Hub
+        env:
+          USUARIO: ${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          falta=0
+          if [ -z "$USUARIO" ]; then
+            echo "::error::El secreto DOCKERHUB_USERNAME esta vacio o no existe"
+            falta=1
+          fi
+          if [ -z "$TOKEN" ]; then
+            echo "::error::El secreto DOCKERHUB_TOKEN esta vacio o no existe"
+            falta=1
+          fi
+          if [ "$falta" -eq 1 ]; then
+            echo ""
+            echo "Revisa en: Settings > Secrets and variables > Actions"
+            echo "  1. Que esten en la pestana SECRETS, no en VARIABLES"
+            echo "  2. Que sean 'Repository secrets', no 'Environment secrets'"
+            echo "  3. Que el nombre este escrito exactamente igual, sin espacios"
+            exit 1
+          fi
+          echo "Secretos presentes: usuario de ${#USUARIO} caracteres, token de ${#TOKEN}."
+
       - name: Entrar en Docker Hub
         uses: docker/login-action@v3
         with:
