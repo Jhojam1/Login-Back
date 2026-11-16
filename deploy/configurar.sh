@@ -14,6 +14,30 @@ set -euo pipefail
 DESTINO=".env"
 
 # -----------------------------------------------------------------------------
+#  Avisar si esto se ejecuta donde no toca
+#
+#  El .env tiene que quedar JUNTO al docker-compose.yml: Docker Compose lo busca
+#  en la carpeta del propio compose, no en la carpeta personal. Crearlo en ~ es
+#  el error mas facil de cometer, y el sintoma que produce despues ("unable to
+#  get image ':backend-latest'") no apunta a la causa por ningun lado.
+# -----------------------------------------------------------------------------
+if [ ! -f "docker-compose.yml" ]; then
+    echo
+    echo "AVISO: en esta carpeta no hay ningun docker-compose.yml."
+    echo "       Estas en: $(pwd)"
+    echo
+    echo "El archivo .env debe crearse junto al docker-compose.yml, normalmente"
+    echo "en ~/login-deploy. Si lo creas en otro sitio, Docker Compose no lo"
+    echo "encontrara y el despliegue fallara."
+    echo
+    read -r -p "Seguir de todas formas? [s/N]: " seguir
+    case "$seguir" in
+        s|S|si|SI|Si) echo ;;
+        *) echo "Cancelado. Prueba con:  cd ~/login-deploy && bash configurar.sh"; exit 1 ;;
+    esac
+fi
+
+# -----------------------------------------------------------------------------
 #  No pisar una configuracion que ya funciona sin avisar
 # -----------------------------------------------------------------------------
 if [ -f "$DESTINO" ]; then
