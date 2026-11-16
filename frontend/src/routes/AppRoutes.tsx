@@ -8,6 +8,7 @@ import { MenuPage } from '../pages/MenuPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegisterPage } from '../pages/RegisterPage';
+import { VerifyCodePage } from '../pages/VerifyCodePage';
 import { RolesPage } from '../pages/RolesPage';
 import { UsersPage } from '../pages/UsersPage';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
@@ -36,6 +37,8 @@ export function AppRoutes() {
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/registro" element={<RegisterPage />} />
+        {/* Segundo paso del login; solo se llega desde /login */}
+        <Route path="/verificar" element={<VerifyCodePage />} />
       </Route>
 
       {/* ---------- Requieren sesión iniciada ---------- */}

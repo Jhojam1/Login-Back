@@ -44,6 +44,32 @@ export const authApi = {
   },
 
   /**
+   * Segundo paso del inicio de sesión: envía el código recibido por correo.
+   *
+   * @param challengeId identificador que devolvió el login
+   * @param code        código que escribió la persona
+   * @returns los tokens y los datos del usuario
+   */
+  async verifyCode(challengeId: string, code: string): Promise<AuthResponse> {
+    const { data } = await apiClient.post<AuthResponse>('/auth/verify-code', {
+      challengeId,
+      code,
+    });
+    return data;
+  },
+
+  /**
+   * Pide que se vuelva a enviar el código.
+   *
+   * @param challengeId identificador del intento en curso
+   * @returns la respuesta con el intento nuevo, todavía sin tokens
+   */
+  async resendCode(challengeId: string): Promise<AuthResponse> {
+    const { data } = await apiClient.post<AuthResponse>('/auth/resend-code', { challengeId });
+    return data;
+  },
+
+  /**
    * Cierra la sesión del dispositivo actual revocando el token de refresco.
    *
    * @param refreshToken token a invalidar en el servidor

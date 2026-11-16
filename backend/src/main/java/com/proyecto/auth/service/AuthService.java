@@ -4,6 +4,8 @@ import com.proyecto.auth.dto.request.ChangePasswordRequest;
 import com.proyecto.auth.dto.request.LoginRequest;
 import com.proyecto.auth.dto.request.RefreshTokenRequest;
 import com.proyecto.auth.dto.request.RegisterRequest;
+import com.proyecto.auth.dto.request.ResendCodeRequest;
+import com.proyecto.auth.dto.request.VerifyCodeRequest;
 import com.proyecto.auth.dto.response.AuthResponse;
 import com.proyecto.auth.dto.response.IntrospectTokenResponse;
 import com.proyecto.auth.dto.response.SessionStatusResponse;
@@ -36,6 +38,26 @@ public interface AuthService {
      * @return tokens de acceso y refresco junto con los datos del usuario
      */
     AuthResponse login(LoginRequest request, String ipAddress, String userAgent);
+
+    /**
+     * Completa el inicio de sesion comprobando el codigo recibido por correo.
+     *
+     * @param request   identificador del intento y codigo introducido
+     * @param ipAddress IP de origen, para auditoria
+     * @param userAgent cliente de origen, para auditoria
+     * @return los tokens, ya con la verificacion superada
+     */
+    AuthResponse verifyCode(VerifyCodeRequest request, String ipAddress, String userAgent);
+
+    /**
+     * Vuelve a enviar el codigo de un intento de inicio de sesion en curso.
+     *
+     * @param request   identificador del intento
+     * @param ipAddress IP de origen
+     * @param userAgent cliente de origen
+     * @return la respuesta con el intento nuevo, todavia sin tokens
+     */
+    AuthResponse resendCode(ResendCodeRequest request, String ipAddress, String userAgent);
 
     /**
      * Canjea un token de refresco valido por un token de acceso nuevo.

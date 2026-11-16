@@ -23,12 +23,27 @@ export interface User {
 }
 
 /** Respuesta de un login o un refresco correctos. */
+/**
+ * Respuesta del inicio de sesión. Tiene dos formas.
+ *
+ * Si la verificación en dos pasos está activada, el primer paso NO devuelve tokens:
+ * solo `mfaRequired: true` y el `challengeId` con el que continuar. Los tokens llegan
+ * en el segundo paso, al enviar el código correcto.
+ */
 export interface AuthResponse {
-  accessToken: string;
-  refreshToken: string;
-  tokenType: string;
-  expiresIn: number;
-  user: User;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenType?: string;
+  expiresIn?: number;
+  user?: User;
+  /** `true` si hay que introducir el código enviado por correo. */
+  mfaRequired: boolean;
+  /** Identificador del intento, necesario para verificar el código. */
+  challengeId?: string;
+  /** Correo parcialmente tapado, para decir a dónde se envió el código. */
+  maskedEmail?: string;
+  /** Segundos que dura el código. */
+  codeExpiresInSeconds?: number;
 }
 
 /** Credenciales del formulario de acceso. */
@@ -172,3 +187,9 @@ export const ROLES = {
   MANAGER: 'ROLE_MANAGER',
   USER: 'ROLE_USER',
 } as const;
+
+/** Datos del segundo paso del inicio de sesión. */
+export interface VerifyCodeRequest {
+  challengeId: string;
+  code: string;
+}

@@ -1,6 +1,7 @@
 package com.proyecto.auth.config;
 
 import com.proyecto.auth.service.RefreshTokenService;
+import com.proyecto.auth.service.VerificationCodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
 public class TokenCleanupTask {
 
     private final RefreshTokenService refreshTokenService;
+    private final VerificationCodeService verificationCodeService;
 
     /**
      * Borra los tokens caducados o revocados una vez al dia, de madrugada.
@@ -29,6 +31,11 @@ public class TokenCleanupTask {
         int deleted = refreshTokenService.purgeExpired();
         if (deleted > 0) {
             log.info("Limpieza programada: {} tokens de refresco eliminados", deleted);
+        }
+
+        int codigos = verificationCodeService.purgeExpired();
+        if (codigos > 0) {
+            log.info("Limpieza programada: {} codigos de verificacion eliminados", codigos);
         }
     }
 }

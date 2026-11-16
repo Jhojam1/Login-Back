@@ -63,6 +63,33 @@ app:
     service-api-key: ${APP_SERVICE_API_KEY:}
     bcrypt-strength: 12
 
+
+  # ============================================================================
+  #  Verificacion en dos pasos por correo
+  #
+  #  Al iniciar sesion se envia un codigo al correo de la persona y no se entregan
+  #  los tokens hasta que lo escribe. El envio lo hace una funcion Lambda que
+  #  mantiene otro equipo; aqui solo se la invoca.
+  #
+  #  Viene activado. El perfil dev apaga la llamada a AWS (ver application-dev.yml)
+  #  para poder trabajar en local sin credenciales.
+  # ============================================================================
+  mfa:
+    enabled: true
+    code-length: 6
+    expiration-minutes: 10
+    max-attempts: 5
+    resend-cooldown-seconds: 60
+
+  lambda:
+    enabled: true
+    function-name: arn:aws:lambda:us-east-2:366101997342:function:lambda-envio-codigos
+    region: us-east-2
+    # Nombres de los campos del JSON que recibe la funcion
+    email-field: correo
+    code-field: codigo
+    timeout-seconds: 10
+
   admin:
     enabled: ${APP_ADMIN_ENABLED:true}
     username: ${APP_ADMIN_USERNAME:admin}

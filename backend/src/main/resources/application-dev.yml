@@ -25,3 +25,15 @@ logging:
   level:
     com.proyecto.auth: DEBUG
     org.hibernate.SQL: DEBUG
+
+# ============================================================================
+#  La verificacion en dos pasos sigue ACTIVA en local, pero el codigo se escribe
+#  en el log en lugar de enviarse por correo: en un portatil no suele haber
+#  credenciales de AWS y, sin ellas, cada intento de login fallaria.
+#
+#  Si quieres probar el envio real desde tu equipo, ejecuta antes "aws configure"
+#  y borra estas dos lineas.
+# ============================================================================
+app:
+  lambda:
+    enabled: false

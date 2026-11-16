@@ -41,7 +41,8 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
-@EnableConfigurationProperties({JwtProperties.class, SecurityProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, SecurityProperties.class,
+        MfaProperties.class, LambdaProperties.class})
 public class SecurityConfig {
 
     /** Rutas publicas que no requieren token alguno. */
@@ -49,6 +50,8 @@ public class SecurityConfig {
             "/api/v1/auth/register",
             "/api/v1/auth/login",
             "/api/v1/auth/refresh",
+            "/api/v1/auth/verify-code",
+            "/api/v1/auth/resend-code",
             "/api/v1/auth/introspect",
             "/api/v1/auth/session-status",
             "/actuator/health/**",

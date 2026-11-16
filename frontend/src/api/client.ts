@@ -112,6 +112,13 @@ async function requestNewAccessToken(): Promise<string> {
     { headers: { 'Content-Type': 'application/json' } },
   );
 
+  // El refresco siempre devuelve tokens: la verificación en dos pasos solo ocurre
+  // en el login inicial. Aun así se comprueba, porque los campos son opcionales en
+  // el tipo y un fallo silencioso aquí dejaría la sesión en un estado imposible.
+  if (!data.accessToken || !data.refreshToken) {
+    throw new Error('El servidor no devolvió los tokens al refrescar la sesión');
+  }
+
   tokenStorage.save(data.accessToken, data.refreshToken);
   return data.accessToken;
 }

@@ -42,7 +42,23 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login({ identifier: identifier.trim(), password });
+      const response = await login({ identifier: identifier.trim(), password });
+
+      // Si falta el segundo paso, no hay sesión todavía: se pasa a la pantalla del
+      // código llevando el identificador del intento en el estado de la ruta, para
+      // que no viaje en la URL ni quede en el historial del navegador.
+      if (response.mfaRequired) {
+        navigate('/verificar', {
+          replace: true,
+          state: {
+            challengeId: response.challengeId,
+            maskedEmail: response.maskedEmail,
+            from: (location.state as { from?: { pathname: string } } | null)?.from,
+          },
+        });
+        return;
+      }
+
       navigate(redirectTo, { replace: true });
     } catch (error) {
       setErrorMessage(getErrorMessage(error));

@@ -6,6 +6,8 @@ import com.proyecto.auth.dto.request.IntrospectTokenRequest;
 import com.proyecto.auth.dto.request.LoginRequest;
 import com.proyecto.auth.dto.request.RefreshTokenRequest;
 import com.proyecto.auth.dto.request.RegisterRequest;
+import com.proyecto.auth.dto.request.ResendCodeRequest;
+import com.proyecto.auth.dto.request.VerifyCodeRequest;
 import com.proyecto.auth.dto.request.SessionStatusRequest;
 import com.proyecto.auth.dto.response.AuthResponse;
 import com.proyecto.auth.dto.response.IntrospectTokenResponse;
@@ -81,6 +83,41 @@ public class AuthController {
                 metadataExtractor.extractUserAgent(httpRequest));
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Segundo paso del inicio de sesion: comprueba el codigo recibido por correo
+     * y, si es correcto, entrega los tokens.
+     *
+     * @param request     identificador del intento y codigo introducido
+     * @param httpRequest peticion HTTP, para la auditoria
+     * @return 200 con los tokens
+     */
+    @PostMapping("/verify-code")
+    @Operation(summary = "Validar el codigo enviado por correo y completar el login")
+    public ResponseEntity<AuthResponse> verifyCode(@Valid @RequestBody VerifyCodeRequest request,
+                                                   HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(authService.verifyCode(
+                request,
+                metadataExtractor.extractIpAddress(httpRequest),
+                metadataExtractor.extractUserAgent(httpRequest)));
+    }
+
+    /**
+     * Vuelve a enviar el codigo de verificacion de un intento en curso.
+     *
+     * @param request     identificador del intento
+     * @param httpRequest peticion HTTP, para la auditoria
+     * @return 200 con el intento nuevo, todavia sin tokens
+     */
+    @PostMapping("/resend-code")
+    @Operation(summary = "Reenviar el codigo de verificacion")
+    public ResponseEntity<AuthResponse> resendCode(@Valid @RequestBody ResendCodeRequest request,
+                                                   HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(authService.resendCode(
+                request,
+                metadataExtractor.extractIpAddress(httpRequest),
+                metadataExtractor.extractUserAgent(httpRequest)));
     }
 
     /**

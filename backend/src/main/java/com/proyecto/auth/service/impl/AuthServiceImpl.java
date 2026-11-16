@@ -1,14 +1,18 @@
 package com.proyecto.auth.service.impl;
 
 import com.proyecto.auth.config.JwtProperties;
+import com.proyecto.auth.config.MfaProperties;
 import com.proyecto.auth.domain.entity.RefreshToken;
 import com.proyecto.auth.domain.entity.Role;
 import com.proyecto.auth.domain.entity.User;
+import com.proyecto.auth.domain.entity.VerificationCode;
 import com.proyecto.auth.domain.enums.RoleName;
 import com.proyecto.auth.dto.request.ChangePasswordRequest;
 import com.proyecto.auth.dto.request.LoginRequest;
 import com.proyecto.auth.dto.request.RefreshTokenRequest;
 import com.proyecto.auth.dto.request.RegisterRequest;
+import com.proyecto.auth.dto.request.ResendCodeRequest;
+import com.proyecto.auth.dto.request.VerifyCodeRequest;
 import com.proyecto.auth.dto.response.AuthResponse;
 import com.proyecto.auth.dto.response.IntrospectTokenResponse;
 import com.proyecto.auth.dto.response.SessionStatusResponse;
@@ -24,6 +28,7 @@ import com.proyecto.auth.security.UserPrincipal;
 import com.proyecto.auth.service.AuthService;
 import com.proyecto.auth.service.LoginAttemptService;
 import com.proyecto.auth.service.RefreshTokenService;
+import com.proyecto.auth.service.VerificationCodeService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -59,6 +64,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProperties jwtProperties;
     private final RefreshTokenService refreshTokenService;
     private final LoginAttemptService loginAttemptService;
+    private final VerificationCodeService verificationCodeService;
+    private final MfaProperties mfaProperties;
     private final UserMapper userMapper;
 
     /**
@@ -120,7 +127,94 @@ public class AuthServiceImpl implements AuthService {
         UserPrincipal principal = authenticate(request);
         loginAttemptService.registerSuccess(principal.getUser());
 
-        return buildAuthResponse(principal, ipAddress, userAgent);
+        // Con la verificacion en dos pasos apagada, la contrasena basta y se entregan
+        // los tokens aqui mismo.
+        if (!mfaProperties.isEnabled()) {
+            return buildAuthResponse(principal, ipAddress, userAgent);
+        }
+
+        // Con la verificacion encendida NO se entrega ningun token todavia: solo el
+        // identificador del intento. Si los tokens viajaran ahora, bastaria con
+        // ignorar la pantalla del codigo para entrar igualmente.
+        VerificationCode verificacion = verificationCodeService
+                .createAndSend(principal.getUser(), ipAddress, userAgent);
+
+        log.info("Login de {} pendiente de verificacion por correo", principal.getUsername());
+
+        return buildPendingResponse(principal.getUser(), verificacion);
+    }
+
+    /**
+     * Completa el inicio de sesion comprobando el codigo recibido por correo.
+     *
+     * @param request   identificador del intento y codigo introducido
+     * @param ipAddress IP de origen
+     * @param userAgent cliente de origen
+     * @return los tokens
+     */
+    @Override
+    @Transactional
+    public AuthResponse verifyCode(VerifyCodeRequest request, String ipAddress, String userAgent) {
+        User user = verificationCodeService.verify(request.challengeId(), request.code());
+
+        // Se vuelve a comprobar el estado de la cuenta: pudieron desactivarla en los
+        // minutos que la persona tardo en mirar el correo.
+        if (!user.isEnabled()) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED",
+                    "Tu cuenta esta desactivada");
+        }
+
+        log.info("Verificacion superada por {}", user.getUsername());
+
+        return buildAuthResponse(new UserPrincipal(user), ipAddress, userAgent);
+    }
+
+    /**
+     * Vuelve a enviar el codigo de un intento en curso.
+     *
+     * @param request   identificador del intento
+     * @param ipAddress IP de origen
+     * @param userAgent cliente de origen
+     * @return la respuesta con el intento nuevo, sin tokens
+     */
+    @Override
+    @Transactional
+    public AuthResponse resendCode(ResendCodeRequest request, String ipAddress, String userAgent) {
+        VerificationCode verificacion = verificationCodeService
+                .resend(request.challengeId(), ipAddress, userAgent);
+
+        return buildPendingResponse(verificacion.getUser(), verificacion);
+    }
+
+    /**
+     * Construye la respuesta de "falta verificar", sin ningun token dentro.
+     *
+     * @param user         usuario que esta intentando entrar
+     * @param verificacion codigo recien generado
+     * @return respuesta con el identificador del intento
+     */
+    private AuthResponse buildPendingResponse(User user, VerificationCode verificacion) {
+        return AuthResponse.builder()
+                .mfaRequired(true)
+                .challengeId(verificacion.getChallengeId())
+                .maskedEmail(maskEmail(user.getEmail()))
+                .codeExpiresInSeconds(mfaProperties.getExpirationMinutes() * 60)
+                .build();
+    }
+
+    /**
+     * Tapa parte del correo para poder decir a donde se envio el codigo sin
+     * revelar la direccion completa a quien solo acerto la contrasena.
+     *
+     * @param email correo completo
+     * @return el correo parcialmente oculto, por ejemplo {@code jh***@correo.com}
+     */
+    private String maskEmail(String email) {
+        int arroba = email.indexOf('@');
+        if (arroba <= 2) {
+            return "***" + email.substring(Math.max(arroba, 0));
+        }
+        return email.substring(0, 2) + "***" + email.substring(arroba);
     }
 
     /**
@@ -329,6 +423,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken.getToken())
                 .tokenType("Bearer")
                 .expiresIn(jwtProperties.getAccessTokenExpirationSeconds())
+                .mfaRequired(false)
                 .user(userMapper.toResponse(principal.getUser()))
                 .build();
     }

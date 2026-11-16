@@ -9,7 +9,7 @@ import {
 import { authApi } from '../api/authApi';
 import { setSessionExpiredHandler } from '../api/client';
 import { tokenStorage } from '../api/tokenStorage';
-import type { LoginRequest, RegisterRequest, User } from '../types/auth';
+import type { AuthResponse, LoginRequest, RegisterRequest, User } from '../types/auth';
 
 /**
  * Estado y acciones de autenticación que cualquier componente puede consumir.
@@ -22,7 +22,10 @@ export interface AuthContextValue {
   /** Atajo para saber si hay sesión activa. */
   isAuthenticated: boolean;
   /** Inicia sesión con las credenciales indicadas. */
-  login: (credentials: LoginRequest) => Promise<void>;
+  /** Primer paso. Si devuelve `mfaRequired`, falta validar el código del correo. */
+  login: (credentials: LoginRequest) => Promise<AuthResponse>;
+  /** Segundo paso: valida el código y abre la sesión. */
+  verifyCode: (challengeId: string, code: string) => Promise<void>;
   /** Registra una cuenta nueva (no inicia sesión automáticamente). */
   register: (payload: RegisterRequest) => Promise<void>;
   /** Cierra la sesión y limpia los tokens. */
@@ -112,11 +115,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *
    * @param credentials usuario o correo y contraseña
    */
-  const login = useCallback(async (credentials: LoginRequest) => {
-    const response = await authApi.login(credentials);
+  /**
+   * Guarda los tokens y el perfil que llegan en una respuesta de login completada.
+   *
+   * <p>Lo usan tanto el login directo (sin verificación) como el segundo paso, para
+   * que la sesión se abra exactamente igual en los dos casos.</p>
+   *
+   * @param response respuesta que ya contiene los tokens
+   */
+  const applySession = useCallback((response: AuthResponse) => {
+    if (!response.accessToken || !response.refreshToken || !response.user) {
+      throw new Error('La respuesta del servidor no trae la sesión completa');
+    }
     tokenStorage.save(response.accessToken, response.refreshToken);
     setUser(response.user);
   }, []);
+
+  const login = useCallback(async (credentials: LoginRequest): Promise<AuthResponse> => {
+    const response = await authApi.login(credentials);
+
+    // Con la verificación en dos pasos, el primer paso NO trae tokens: solo el
+    // identificador del intento. La sesión no se abre hasta validar el código.
+    if (!response.mfaRequired) {
+      applySession(response);
+    }
+
+    return response;
+  }, [applySession]);
+
+  /**
+   * Completa el inicio de sesión con el código recibido por correo.
+   *
+   * @param challengeId identificador que devolvió el login
+   * @param code        código introducido
+   */
+  const verifyCode = useCallback(
+    async (challengeId: string, code: string) => {
+      applySession(await authApi.verifyCode(challengeId, code));
+    },
+    [applySession],
+  );
 
   /**
    * Registra una cuenta nueva.
@@ -196,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isAuthenticated: user !== null,
       login,
+      verifyCode,
       register,
       logout,
       refreshProfile,
@@ -203,7 +242,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasAnyPermission,
       hasRole,
     }),
-    [user, isLoading, login, register, logout, refreshProfile, hasPermission, hasAnyPermission, hasRole],
+    [user, isLoading, login, verifyCode, register, logout, refreshProfile,
+      hasPermission, hasAnyPermission, hasRole],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

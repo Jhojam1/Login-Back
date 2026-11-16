@@ -190,7 +190,10 @@ quitándoles el `.example` y el resultado nunca se sube a Git.
 | `POST` | `/api/v1/auth/register` | Crear una cuenta (recibe `ROLE_USER`) |
 | `POST` | `/api/v1/auth/login` | Iniciar sesión y obtener los tokens |
 | `POST` | `/api/v1/auth/refresh` | Renovar el token de acceso |
+| `POST` | `/api/v1/auth/verify-code` | **Segundo paso del login**: validar el código del correo |
+| `POST` | `/api/v1/auth/resend-code` | Reenviar el código de verificación |
 | `POST` | `/api/v1/auth/introspect` | **Validar un token** (lo usan otros microservicios) |
+| `POST` | `/api/v1/auth/session-status` | **Saber si un usuario tiene sesión** (solo informativo) |
 
 ### Requieren sesión
 
@@ -233,6 +236,76 @@ quitándoles el `.example` y el resultado nunca se sube a Git.
 Al crear un usuario desde el panel sí se eligen sus roles; el registro público nunca
 los acepta (usa un DTO que no tiene ese campo), así que no hay forma de auto-asignarse
 `ROLE_ADMIN` desde el formulario abierto.
+
+---
+
+## Verificación en dos pasos por correo
+
+Al iniciar sesión se envía un código al correo de la persona y **los tokens no se
+entregan hasta que lo escribe**. El correo lo manda una función Lambda que mantiene
+otro equipo; este backend solo la invoca.
+
+Viene **activada**. Para apagarla, `app.mfa.enabled: false` en `application.yml`.
+
+```
+1. POST /auth/login  (usuario + contraseña)
+   → NO devuelve tokens, devuelve:
+     { "mfaRequired": true, "challengeId": "V8sIjp...",
+       "maskedEmail": "ad***@proyecto.com", "codeExpiresInSeconds": 600 }
+   → e invoca la Lambda con  { "correo": "...", "codigo": "968269" }
+
+2. POST /auth/verify-code  { challengeId, code }
+   → ahora sí: accessToken + refreshToken
+```
+
+**Por qué el primer paso no entrega tokens:** si los diera, bastaría con ignorar la
+pantalla del código para entrar igual, y la verificación no serviría de nada.
+
+**Por qué un `challengeId` y no el nombre de usuario:** si el segundo paso aceptara un
+username, cualquiera podría probar códigos contra cuentas ajenas. Ese valor aleatorio
+solo lo tiene quien acaba de acertar la contraseña.
+
+| Protección | Cómo |
+|---|---|
+| El código no se guarda en claro | Se almacena su hash BCrypt |
+| Fuerza bruta | 5 intentos y el código queda inservible |
+| Reutilización | Se marca como usado al acertar |
+| Caducidad | 10 minutos |
+| Avalancha de correos | 60 segundos de espera entre reenvíos |
+| Contraseña incorrecta | Ni siquiera se genera código |
+
+### Qué hace falta en AWS
+
+El EC2 necesita un rol de IAM con permiso para invocar la función. **No se guarda
+ninguna clave de AWS en el proyecto**: el SDK usa el rol de la instancia.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "lambda:InvokeFunction",
+    "Resource": "arn:aws:lambda:us-east-2:366101997342:function:lambda-envio-codigos"
+  }]
+}
+```
+
+Ojo con la región: la función está en `us-east-2` aunque el EC2 esté en otra.
+
+### En local
+
+El perfil `dev` deja la verificación activa pero **escribe el código en el log** en
+lugar de llamar a AWS, porque en un portátil no suele haber credenciales. Se recorre
+el flujo completo sin enviar correos:
+
+```
+ MODO DESARROLLO: el correo no se envia de verdad
+ Destinatario: admin@proyecto.com
+ Codigo:       968269
+```
+
+Para probar el envío real desde tu equipo: `aws configure` y quita
+`app.lambda.enabled: false` de `application-dev.yml`.
 
 ---
 
