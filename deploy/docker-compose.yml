@@ -17,6 +17,10 @@
 #    docker compose logs -f       ver los registros
 #    docker compose down          parar todo
 # =============================================================================
+# Los servicios NO llevan container_name fijo a proposito: ese nombre seria global
+# en toda la maquina, y bastaria con lanzar compose desde otra carpeta para chocar
+# con "the container name is already in use". Sin el, Docker los nombra por proyecto
+# y nunca colisionan. Se siguen manejando igual: docker compose logs backend
 services:
 
   # ---------------------------------------------------------------------------
@@ -24,7 +28,6 @@ services:
   # ---------------------------------------------------------------------------
   backend:
     image: ${IMAGE_REPO}:backend-latest
-    container_name: login-backend
     restart: unless-stopped
 
     # Las credenciales salen del .env de al lado, que no esta en Git. En este
@@ -68,7 +71,6 @@ services:
   # ---------------------------------------------------------------------------
   frontend:
     image: ${IMAGE_REPO}:frontend-latest
-    container_name: login-frontend
     restart: unless-stopped
 
     # 80 en la maquina -> 8080 dentro del contenedor, que corre sin privilegios.
